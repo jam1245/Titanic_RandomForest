@@ -1,0 +1,202 @@
+---
+title: "R Notebook"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+This is an example of a classic decision tree model.  Here I downloaded the test and train datasets on kaggle and ran this in R Studio. 
+
+```{r}
+
+library(readr)
+train <- read_csv("C:/Users/....train.csv", 
+     col_types = cols(Fare = col_number(), 
+         Age = col_number()))
+View(train)
+
+
+test <- read_csv("C:/Users/...test.csv", 
+     col_types = cols(Age = col_number(), 
+         Fare = col_number()))
+View(test)
+
+str(train)
+str(test)
+```
+
+
+
+
+##Data Dictionary
+
+###Variable	Definition	Key
+survival	Survival	    0 = No, 1 = Yes
+pclass	Ticket class	  1 = 1st, 2 = 2nd, 3 = 3rd
+sex	Sex	
+Age	Age in years	
+sibsp	# of siblings / spouses aboard the Titanic	
+parch	# of parents / children aboard the Titanic	
+ticket	Ticket number	
+fare	Passenger fare	
+cabin	Cabin number	
+embarked	Port of Embarkation	C = Cherbourg, Q = Queenstown, S = Southampton
+Variable Notes
+
+pclass: A proxy for socio-economic status (SES)
+1st = Upper
+2nd = Middle
+3rd = Lower
+
+age: Age is fractional if less than 1. If the age is estimated, is it in the form of xx.5
+
+sibsp: The dataset defines family relations in this way...
+Sibling = brother, sister, stepbrother, stepsister
+Spouse = husband, wife (mistresses and fianc?s were ignored)
+
+parch: The dataset defines family relations in this way...
+Parent = mother, father
+Child = daughter, son, stepdaughter, stepson
+Some children travelled only with a nanny, therefore parch=0 for them.
+
+```{r}
+# view the survival numbers 
+table(train$Survived)
+
+test$Survived <- NA
+all_data <- rbind(train, test)
+
+str(all_data)
+head(all_data)
+
+```
+
+Let's get to know the data by creating a few simple visuals 
+```{r}
+library(ggplot2)
+# Look at the distribution of sex per class 
+ggplot(train,aes(x=factor(Pclass),fill=factor(Sex))) +
+    geom_bar(position='dodge') +
+    ggtitle("Training Set")
+
+ggplot(all_data,aes(x=factor(Pclass),fill=factor(Sex))) +
+    geom_bar(position='dodge') +
+    ggtitle("All Data")
+
+```
+
+
+
+```{r}
+# look at the distribution of sex that survived or died.  It appears that more females survived.   
+# for this set we'll just look at the training data because we filled the test$Survived column with NAs to better visualize all the data together and make visual comparisons. 
+ggplot(train,aes(x=factor(Survived),fill=factor(Sex))) +
+    geom_bar(position='dodge') +
+    ggtitle("Training Set")
+
+#here's a look at the exact numbers
+table(train$Sex, train$Survived)
+```
+
+We can view the survival distribution of children by cabin class and sex.
+
+```{r}
+# using just the training data 
+children <- subset(train, Age <= 18) 
+ggplot(children,aes(x=factor(Pclass),fill=factor(Sex))) +
+      geom_bar(position='dodge') +
+      facet_grid(.~ Survived) +
+      ggtitle("Training Set")
+```
+
+
+
+```{r}
+ggplot(train, aes(x=factor(Pclass), fill=factor(Sex))) +
+    geom_bar(position='dodge') +
+    facet_grid(.~ Survived)
+
+# now let's view this slightly differently
+posn.j <- position_jitter(0.3, 0)
+
+ggplot(train, aes(x=factor(Pclass), y=Age, col=factor(Sex))) +
+  geom_jitter(size=3, alpha=0.5, position=posn.j) +
+  facet_grid(. ~ Survived)
+```
+
+Let's now look at survival in the context of the cost of ticket and gender.  It appears females that paid more for their tickets had a better chance of survival. 
+```{r}
+posn.j <- position_jitter(0.4, 0)
+
+ggplot(train, aes(x=factor(Sex), y=Fare, col=factor(Sex))) +
+  geom_jitter(size=3, alpha=0.5, position=posn.j) +
+  facet_grid(. ~ Survived)
+```
+
+
+
+```{r}
+# Create the column child, and indicate whether child or no child
+train$Child <- NA
+test$Child <- NA
+
+train$Child[train$Age < 18] <- 1
+train$Child[train$Age >= 18] <- 0
+
+test$Child[test$Age < 18] <- 1
+test$Child[test$Age >= 18] <- 0
+
+
+#view the new column to see what's happening with the data.  There's a number of NAs where we didn't have data for age. 
+train$Child
+```
+
+
+```{r}
+#install.packages("rpart")
+#install.packages('rattle')
+#install.packages('rpart.plot')
+#install.packages('RColorBrewer')
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+```
+
+
+```{r}
+fit <- rpart(Survived ~ Pclass + Sex + Age + SibSp + Fare + Embarked + Child, data = train, method = 'class')
+
+```
+
+
+```{r}
+rpart.plot(fit)
+```
+
+```{r}
+
+prediction <- predict(fit, test, type = "class")
+```
+
+
+```{r}
+solution <- data.frame(PassengerId = test$PassengerId, Survived = prediction)
+
+head(solution) # look at your survival predictions in the context of passenger ids in the test set
+```
+
+
+```{r}
+
+write.csv(solution, file = "firstforest.csv", row.names = FALSE)
+
+```
+
+
+
+
+
+
+
+
+
